@@ -1,19 +1,25 @@
-name: Build Main_MiSTer
-on: [push, workflow_dispatch]
+name: CI Build
+
+on:
+  push:
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Build MiSTer Binary
-        uses: the-mister-devel-project/mister-build-action@v1
-        with:
-          target: 'Main_MiSTer'
 
-      - name: Upload Result
+      - name: Build
+        run: set -o pipefail && curl --fail --location https://raw.githubusercontent.com/MiSTer-unstable-nightlies/Build-Automation_MiSTer/main/build.sh | bash -
+        env:
+          REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Explicitly set the target for Main_MiSTer
+          TARGET: Main_MiSTer
+
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: MiSTer
+          name: MiSTer-Binary
           path: MiSTer
