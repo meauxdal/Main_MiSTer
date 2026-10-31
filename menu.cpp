@@ -63,6 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "joymapping.h"
 #include "recent.h"
 #include "support.h"
+#include "support/mac/swim2.h"
 #include "bootcore.h"
 #include "ide.h"
 #include "profiling.h"
@@ -2646,6 +2647,7 @@ void HandleUI(void)
 									if (is_pcfx() && !ex && bit == PCFX_BIT_EJECT_CARD) pcfx_eject_card();
 
 									user_io_status_set(opt, 1, ex);
+									if (!ex && bit == 16) swim2_retry();
 									if (is_n64() && !ex && !strcmp(opt, "[41]")) n64_save_dd_disk();
 									user_io_status_set(opt, 0, ex);
 

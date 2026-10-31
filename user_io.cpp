@@ -42,6 +42,7 @@
 #include "frame_timer.h"
 #include "scaler.h"
 #include "support.h"
+#include "support/mac/swim2.h"
 
 static char core_path[1024] = {};
 static char rbf_path[1024] = {};
@@ -2210,6 +2211,11 @@ void user_io_file_info(const char *ext)
 
 int user_io_file_mount(const char *name, unsigned char index, char pre, int pre_size)
 {
+	if (!swim2_can_mount(index, !name[0]))
+	{
+		printf("SWIM II: image owned; eject waits for completed storage.\n");
+		return 0;
+	}
 	int writable = 0;
 	int ret = 0;
 	int len = strlen(name);
@@ -3338,6 +3344,7 @@ void user_io_poll()
 	user_io_send_buttons(0);
 
 	mac_poll();   // Mac SCSI family: Toolbox slot announce + deferred CD work
+	swim2_poll();
 	sun_poll();   // Sun SCSI family: write-buffer flushes
 	hp9k_poll();
 	sgi_poll();
@@ -3572,6 +3579,10 @@ void user_io_poll()
 				// Handled by N64 core logic.
 				// If n64_process_save returns false (e.g. use_save is off, or unsupported op),
 				// it will fall through to the generic handler below.
+			}
+			else if (swim2_sd_service(disk, &sd_image[disk], op, lba, sz,
+			                                   ack, fio_size, &buffer_lba[disk]))
+			{
 			}
 			else if (op == 2)
 			{
