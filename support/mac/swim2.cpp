@@ -13,10 +13,12 @@ static const uint16_t swim2_status = 0x08, swim2_result = 0x09;
 static bool eject_pending;
 static uint32_t eject_token;
 
-static bool is_q605()
+static bool is_swim2_core()
 {
 	return !strncasecmp(user_io_get_core_name(0), "macquadra605", 12) ||
-	       !strncasecmp(user_io_get_core_name(1), "macquadra605", 12);
+	       !strncasecmp(user_io_get_core_name(1), "macquadra605", 12) ||
+	       !strncasecmp(user_io_get_core_name(0), "maclc475", 8) ||
+	       !strncasecmp(user_io_get_core_name(1), "maclc475", 8);
 }
 
 struct swim2_request
@@ -55,7 +57,7 @@ static void control_request(uint32_t token, uint16_t action)
 
 bool swim2_can_mount(int disk, bool eject)
 {
-	if (disk != swim2_slot || !is_q605()) return true;
+	if (disk != swim2_slot || !is_swim2_core()) return true;
 	swim2_request r = read_request();
 	if (r.magic != 0x5357) return true;
 	if (r.status == 0x0100 && r.slot == swim2_slot)
@@ -78,7 +80,7 @@ bool swim2_can_mount(int disk, bool eject)
 
 void swim2_poll()
 {
-	if (!is_q605()) { eject_pending = false; return; }
+	if (!is_swim2_core()) { eject_pending = false; return; }
 	if (!eject_pending) return;
 	swim2_request r = read_request(0x0c);
 	if (!control_valid(r) || r.token != eject_token)
@@ -93,7 +95,7 @@ void swim2_poll()
 
 bool swim2_retry()
 {
-	if (!is_q605()) return false;
+	if (!is_swim2_core()) return false;
 	swim2_request r = read_request(0x0c);
 	if (!control_valid(r) || (r.status & 0x21) != 1) return false;
 	if ((r.status & 0x14) == 0x14) control_request(r.token, 3);
@@ -146,7 +148,7 @@ static bool read_sector(fileTYPE *file, uint32_t lba, uint8_t *data)
 int swim2_sd_service(int disk, fileTYPE *file, int op, uint64_t lba,
                      uint32_t size, int ack, int wide, uint64_t *cache_lba)
 {
-	if (disk != swim2_slot || (op != 1 && op != 2) || !is_q605()) return 0;
+	if (disk != swim2_slot || (op != 1 && op != 2) || !is_swim2_core()) return 0;
 
 	bool reading = op == 1;
 	swim2_request r = read_request(reading ? 0x0a : swim2_status);

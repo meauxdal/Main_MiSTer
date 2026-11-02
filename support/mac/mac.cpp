@@ -28,7 +28,7 @@ char is_mac_scsi_family()
 char is_mac_scsi_optimized()
 {
 	return is_core_named("macquadra800") || is_core_named("macquadra605")
-	    || is_core_named("macppc7300");
+	    || is_core_named("maclc475") || is_core_named("macppc7300");
 }
 
 char is_mac_ring_eth()
