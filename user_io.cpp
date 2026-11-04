@@ -444,6 +444,13 @@ char is_marty()
 	return (is_marty_type == 1);
 }
 
+static int is_videobrain_type = 0;
+char is_videobrain()
+{
+	if (!is_videobrain_type) is_videobrain_type = strcasecmp(orig_name, "VideoBrain") ? 2 : 1;
+	return (is_videobrain_type == 1);
+}
+
 static int is_pcfx_type = 0;
 char is_pcfx()
 {
@@ -516,6 +523,7 @@ void user_io_read_core_name()
 	is_electron_type = 0;
 	is_saturn_type = 0;
 	is_marty_type = 0;
+	is_videobrain_type = 0;
 	is_pcfx_type = 0;
 	is_n64_type = 0;
 	is_uneon_type = 0;
@@ -1687,6 +1695,7 @@ void user_io_init(const char *path, const char *xml)
 					if (is_uneon()) x86_ide_set();
 					if (is_cdi()) cdi_load_root_nvram();
 					if (is_marty()) marty_init();
+					if (is_videobrain()) videobrain_init();
 					if (is_pcfx()) pcfx_init();
 
 					if (!strlen(path) || !user_io_file_tx(path, 0, 0, 0, 1))
@@ -4064,6 +4073,7 @@ void user_io_poll()
 	if (is_pce()) pcecd_poll();
 	if (is_saturn()) saturn_poll();
 	if (is_marty()) marty_poll();
+	if (is_videobrain()) videobrain_poll();
 	if (is_pcfx()) pcfx_poll();
 	if (is_cdi()) cdi_poll();
 	if (is_psx()) psx_poll();
