@@ -52,6 +52,30 @@ char mac_cd_read_keeps_audio()
 	return type == 1;
 }
 
+// Cores that can hold the Apple IIe card, whose drives sit on hps_io slots 8
+// and up: the LC family (MacLC, MacLCII, MacLCIII, MacLC475, MacLC520, ...)
+// and the Color Classic family. Prefix match.
+static char is_mac_iie_host()
+{
+	static int type = 0;
+	if (!type) type = (is_core_named("maclc") || is_core_named("maccolorclassic")) ? 1 : 2;
+	return type == 1;
+}
+
+// The generic mount notice is one byte: (1 << index) | RO flag 0x80, so slot 8
+// and up truncate to 0, which hps_io takes as a mount of slot 0. IIe-capable
+// cores get the same value as a 16-bit word instead. Slots 0-7 see identical
+// bits; slot 8 and up land in the high byte, where unmodified hps_io already
+// reads them (img_mounted <= io_din[VD:0]). The RO flag stays bit 7, so a
+// read-only mount also raises img_mounted[7]; the core must ignore bit 7
+// whenever another bit is set.
+int mac_mount_notice(int index, int writable)
+{
+	if (!is_mac_iie_host()) return 0;
+	spi_uio_cmd16(UIO_SET_SDSTAT, (uint16_t)((1 << index) | (writable ? 0 : 0x80)));
+	return 1;
+}
+
 char is_mac_ring_eth()
 {
 	static int type = 0;

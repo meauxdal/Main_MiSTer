@@ -2147,7 +2147,8 @@ int user_io_file_mount(const char *name, unsigned char index, char pre, int pre_
 	DisableIO();
 
 	// notify core of possible sd image change
-	spi_uio_cmd8(UIO_SET_SDSTAT, (1 << index) | (writable ? 0 : 0x80));
+	if (!mac_mount_notice(index, writable))
+		spi_uio_cmd8(UIO_SET_SDSTAT, (1 << index) | (writable ? 0 : 0x80));
 	return ret ? 1 : 0;
 }
 

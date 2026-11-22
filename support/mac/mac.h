@@ -28,6 +28,12 @@ int mac_cd_toolbox_slot();
 // *writable and sets f->size to the virtual disc size.
 int mac_mount_hook(int index, const char *name, fileTYPE *f, int *writable);
 
+// Sends the UIO_SET_SDSTAT mount notice as a 16-bit word on cores that can
+// hold the Apple IIe card (LC and Color Classic families), so slots 8 and up
+// reach the core. Returns 0 for other cores (caller sends
+// the generic one-byte notice).
+int mac_mount_notice(int index, int writable);
+
 // Once per user_io_poll: announce the Toolbox slots to the core and run the
 // deferred CD work (SET NEXT CD remount, boot repulse). No-op for other cores.
 void mac_poll();
