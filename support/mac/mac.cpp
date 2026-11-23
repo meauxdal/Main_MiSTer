@@ -11,6 +11,9 @@
 #include "mac.h"
 #include "mac_eth.h"
 #include "mac_disk.h"
+#include "swim2.h"
+
+static void mac_swim2_poll();
 
 static char is_core_named(const char *n)
 {
@@ -25,11 +28,13 @@ char is_mac_scsi_family()
 	if (!type)
 	{
 		type = (is_core_named("maclc") || is_core_named("macplus") || is_core_named("macquadra800")
-	    || is_core_named("macppc7300") || is_core_named("pippin")) ? 1 : 2;
+	    || is_core_named("macquadra605") || is_core_named("macppc7300") || is_core_named("pippin")) ? 1 : 2;
 		if (type == 1)
 		{
 			sd_service = mac_sd_service;
-			core_poll = mac_poll;
+			// The Quadra 605 and LC 475 also carry a SWIM II floppy slot.
+			core_poll = (is_core_named("macquadra605") || is_core_named("maclc475"))
+			    ? mac_swim2_poll : mac_poll;
 		}
 	}
 	return type == 1;
@@ -40,7 +45,8 @@ char is_mac_scsi_optimized()
 	static int type = 0;
 	if (!type)
 	{
-		type = (is_core_named("macquadra800") || is_core_named("macppc7300") || is_core_named("pippin")) ? 1 : 2;
+		type = (is_core_named("macquadra800") || is_core_named("macquadra605")
+		    || is_core_named("maclc475") || is_core_named("macppc7300") || is_core_named("pippin")) ? 1 : 2;
 	}
 	return type == 1;
 }
@@ -119,6 +125,13 @@ int mac_mount_hook(int index, const char *name, fileTYPE *f, int *writable)
 		return 0;
 	}
 	return 1;
+}
+
+// Poll hook for the Mac cores that also have a SWIM II floppy slot.
+static void mac_swim2_poll()
+{
+	mac_poll();
+	swim2_poll();
 }
 
 // Announce a Toolbox slot once per core session: the UIO_SET_SDSTAT pulse

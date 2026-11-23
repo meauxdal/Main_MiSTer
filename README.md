@@ -1,3 +1,5 @@
+[![CI Build](https://github.com/meauxdal/Main_MiSTer/actions/workflows/build.yml/badge.svg)](https://github.com/meauxdal/Main_MiSTer/actions/workflows/build.yml)
+
 # Main_MiSTer Main Binary and Wiki Repo
 
 This repo serves as the home for the MiSTer Main binaries and the Wiki.
