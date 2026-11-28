@@ -131,17 +131,27 @@ static bool read_sector(fileTYPE *file, uint32_t lba, uint8_t *data)
 	int fd = fileno(file->filp);
 	int flags = fcntl(fd, F_GETFL);
 	struct stat64 st;
+	const uint64_t offset = uint64_t(lba) * 512;
 	if (flags < 0 || (flags & O_ACCMODE) == O_WRONLY ||
 	    fstat64(fd, &st) || !S_ISREG(st.st_mode) || st.st_size != file->size ||
-	    st.st_size <= 0 || (st.st_size & 511) || lba >= uint64_t(st.st_size) / 512)
+	    st.st_size <= 0 || offset >= uint64_t(st.st_size))
+		return false;
+
+	// Disk Copy 4.2 adds a header and optional tag fork to a sector image.
+	// Only allow partial reads for its standard container lengths. The FPGA
+	// validates the header before mounting, and the write path stays aligned.
+	const uint64_t bytes = st.st_size;
+	if ((bytes & 511) && bytes != 409684 && bytes != 419284 &&
+		bytes != 819284 && bytes != 838484 && bytes != 737364 && bytes != 1474644)
 		return false;
 
 	clearerr(file->filp);
-	__off64_t offset = uint64_t(lba) * 512;
 	if (fseeko64(file->filp, offset, SEEK_SET)) return false;
-	size_t count = fread(data, 1, 512, file->filp);
-	if (count != 512 || ferror(file->filp)) return false;
-	file->offset = offset + 512;
+	const uint64_t remaining = bytes - offset;
+	const size_t want = remaining < 512 ? remaining : 512;
+	if (fread(data, 1, want, file->filp) != want || ferror(file->filp)) return false;
+	memset(data + want, 0, 512 - want);
+	file->offset = offset + want;
 	return true;
 }
 
