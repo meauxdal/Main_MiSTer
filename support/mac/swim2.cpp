@@ -137,17 +137,27 @@ static bool read_sector(fileTYPE *file, uint32_t lba, uint8_t *data)
 	    st.st_size <= 0 || offset >= uint64_t(st.st_size))
 		return false;
 
-	// Disk Copy 4.2 adds a header and optional tag fork to a sector image.
-	// Only allow partial reads for its standard container lengths. The FPGA
-	// validates the header before mounting, and the write path stays aligned.
 	const uint64_t bytes = st.st_size;
-	if ((bytes & 511) && bytes != 409684 && bytes != 419284 &&
-		bytes != 819284 && bytes != 838484 && bytes != 737364 && bytes != 1474644)
-		return false;
+	const uint64_t remaining = bytes - offset;
+	const bool dc42 = bytes == 409684 || bytes == 419284 || bytes == 819284 ||
+					  bytes == 838484 || bytes == 737364 || bytes == 1474644;
+	if ((bytes & 511) && !dc42)
+	{
+		if (bytes < 1536 || bytes > 4194304) return false;
+		// Validate nonaligned MOOF images on the first and final requests.
+		// The core also checks the header before loading the remaining blocks.
+		if (offset == 0 || remaining < 512)
+		{
+			uint8_t magic[8];
+			clearerr(file->filp);
+			if (fseeko64(file->filp, 0, SEEK_SET) ||
+				fread(magic, 1, sizeof(magic), file->filp) != sizeof(magic) ||
+				memcmp(magic, "MOOF\xff\x0a\x0d\x0a", sizeof(magic))) return false;
+		}
+	}
 
 	clearerr(file->filp);
 	if (fseeko64(file->filp, offset, SEEK_SET)) return false;
-	const uint64_t remaining = bytes - offset;
 	const size_t want = remaining < 512 ? remaining : 512;
 	if (fread(data, 1, want, file->filp) != want || ferror(file->filp)) return false;
 	memset(data + want, 0, 512 - want);
