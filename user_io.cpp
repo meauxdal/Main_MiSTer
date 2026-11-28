@@ -208,10 +208,11 @@ char *user_io_get_core_path(const char *suffix, int recheck)
 }
 
 // Guests that read the battery clock as UTC and apply their own time zone
-// (UNIX systems); every other guest gets the timestamp in local time.
+// (UNIX systems, and Genera on the XL1200); every other guest gets the
+// timestamp in local time.
 static char rtc_is_utc()
 {
-	return is_next() || is_hp9k_family();
+	return is_next() || is_hp9k_family() || is_xl1200();
 }
 
 static char is_arcade_type = 0;
@@ -1106,6 +1107,93 @@ void SetMidiLinkMode(int mode)
 	}
 }
 
+// A missing profile must not change the external synthesizer.
+uint8_t mt32pi_usb_synth = 0xFF;
+bool mt32pi_usb_enabled = false;
+static bool mt32pi_usb_pending = false;
+static decltype(GetTimer(0)) mt32pi_usb_deadline;
+static decltype(GetTimer(0)) mt32pi_usb_retry;
+
+void mt32pi_usb_set_enabled(bool enabled)
+{
+	mt32pi_usb_enabled = enabled;
+	if (!enabled) mt32pi_usb_pending = false;
+}
+
+static bool mt32pi_usb_mode()
+{
+	return GetUARTMode() == 3 && GetMidiLinkMode() == 2;
+}
+
+static bool mt32pi_usb_send_synth(unsigned int synth)
+{
+	if (!mt32pi_usb_enabled || !mt32pi_usb_mode() || synth >= 4 ||
+	    access("/tmp/ML_CONTROL", F_OK) != 0)
+		return false;
+
+	char command[96];
+	snprintf(command, sizeof(command),
+	         "/sbin/mlinkutil SYSEX F0 7D 03 %02X F7", synth);
+	return system(command) == 0;
+}
+
+void mt32pi_usb_select_synth(bool previous)
+{
+	mt32pi_usb_pending = false;
+	unsigned int next = mt32pi_usb_synth < 4
+	    ? (mt32pi_usb_synth + (previous ? 3 : 1)) & 3
+	    : (previous ? 3 : 0);
+	if (mt32pi_usb_send_synth(next))
+		mt32pi_usb_synth = next;
+}
+
+void mt32pi_usb_save_synth()
+{
+	if (!mt32pi_usb_mode()) return;
+	char name[256];
+	snprintf(name, sizeof(name), "mt32pimode.%s", user_io_get_core_name());
+	uint8_t profile[] = { mt32pi_usb_synth, uint8_t(mt32pi_usb_enabled) };
+	FileSaveConfig(name, profile, sizeof(profile));
+}
+
+static void mt32pi_usb_load_synth()
+{
+	mt32pi_usb_set_enabled(false);
+	mt32pi_usb_synth = 0xFF;
+	if (!mt32pi_usb_mode()) return;
+
+	char name[256];
+	uint8_t profile[] = { 0xFF, 0 };
+	snprintf(name, sizeof(name), "mt32pimode.%s", user_io_get_core_name());
+	const int size = FileLoadConfig(name, 0, 0);
+	if (size != 1 && size != 2) return;
+	if (!FileLoadConfig(name, profile, size)) return;
+
+	if (profile[0] < 4) mt32pi_usb_synth = profile[0];
+	mt32pi_usb_set_enabled(size == 2 && profile[1] == 1);
+	if (!mt32pi_usb_enabled || mt32pi_usb_synth >= 4) return;
+	mt32pi_usb_pending = true;
+	mt32pi_usb_deadline = GetTimer(5000);
+	mt32pi_usb_retry = GetTimer(125);
+}
+
+static void mt32pi_usb_poll_synth()
+{
+	if (!mt32pi_usb_pending) return;
+	if (!mt32pi_usb_mode() || CheckTimer(mt32pi_usb_deadline))
+	{
+		mt32pi_usb_pending = false;
+		return;
+	}
+	if (!CheckTimer(mt32pi_usb_retry)) return;
+
+	mt32pi_usb_retry = GetTimer(100);
+	if (mt32pi_usb_send_synth(mt32pi_usb_synth))
+	{
+		mt32pi_usb_pending = false;
+	}
+}
+
 void ResetUART()
 {
 	if (uart_mode)
@@ -1219,6 +1307,7 @@ void user_io_init(const char *path, const char *xml)
 	ibmrs6k_enet_stop();
 	sgi_enet_stop();
 	decalpha_enet_stop();
+	xl1200_enet_stop();
 
 	// we need to set the directory to where the XML file (MRA) is
 	// not the RBF. The RBF will be in arcade, which the user shouldn't
@@ -1315,6 +1404,7 @@ void user_io_init(const char *path, const char *xml)
 	is_ibmrs6k();
 	is_sgi_family();
 	is_decalpha();
+	is_xl1200();
 	is_marty();
 	is_pcfx();
 	is_apple3();
@@ -1405,6 +1495,7 @@ void user_io_init(const char *path, const char *xml)
 				if (is_ibmrs6k()) ibmrs6k_enet_start();
 				if (is_sgi_family()) sgi_enet_start();
 				if (is_decalpha()) decalpha_enet_start();
+				if (is_xl1200()) xl1200_enet_start();
 
 				if (xml && isXmlName(xml) == 1)
 				{
@@ -1594,6 +1685,7 @@ void user_io_init(const char *path, const char *xml)
 	if (uartmode < 3 || uartmode > 4) midilink = 0;
 	SetMidiLinkMode(midilink);
 	SetUARTMode(uartmode);
+	mt32pi_usb_load_synth();
 
 	f12_mod = spi_uio_cmd(UIO_GET_F12_MOD);
 
@@ -2049,6 +2141,7 @@ int user_io_file_mount(const char *name, unsigned char index, char pre, int pre_
 				if (ret) ret = mac_mount_hook(index, name, &sd_image[index], &writable);
 				// Sun CD slot: CUE/CHD/raw image translation (support/sun)
 				if (ret) ret = sun_mount_hook(index, name, &sd_image[index], &writable);
+				if (ret) ret = firebeat_mount_hook(index, name, &sd_image[index], &writable);
 				if (ret) ret = hp9k_mount_hook(index, name, &sd_image[index], &writable);
 				if (ret) ret = ibmrs6k_mount_hook(index, name, &sd_image[index], &writable);
 				if (ret) ret = sgi_mount_hook(index, name, &sd_image[index], &writable);
@@ -2080,6 +2173,7 @@ int user_io_file_mount(const char *name, unsigned char index, char pre, int pre_
 		c64_closeGCR(index);
 		mac_cdrom_unmount(index);
 		sun_unmount(index);
+		firebeat_unmount(index);
 		hp9k_unmount(index);
 		ibmrs6k_unmount(index);
 		sgi_unmount(index);
@@ -3075,6 +3169,7 @@ void user_io_reset_res_timer()
 
 void user_io_poll()
 {
+	mt32pi_usb_poll_synth();
 	#ifdef PROFILING
 		PROFILE_FUNCTION();
 	#endif
