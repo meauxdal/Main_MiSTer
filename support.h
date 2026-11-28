@@ -24,6 +24,7 @@
 #include "support/falcon/falcon_scsi.h"
 // Sun family support
 #include "support/sun/sun.h"
+#include "support/firebeat/firebeat.h"
 #include "support/sun/sun_enet.h"
 // HP 9000 family support
 #include "support/hp9k/hp9k.h"
@@ -35,6 +36,7 @@
 #include "support/sgi/sgi_enet.h"
 #include "support/decalpha/decalpha.h"
 #include "support/decalpha/decalpha_enet.h"
+#include "support/xl1200/xl1200.h"
 
 // Archie support
 #include "support/archie/archie.h"
