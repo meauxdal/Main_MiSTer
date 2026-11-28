@@ -9,6 +9,8 @@
 #include "mac_cdrom.h"
 #include "mac_toolbox.h"
 
+void mac_init();
+
 // Cores sharing the MacLC scsi.v target and its HPS features.
 char is_mac_scsi_family();
 

@@ -1308,7 +1308,7 @@ void user_io_init(const char *path, const char *xml)
 	}
 
 	is_minimig();
-	is_mac_scsi_family();
+	mac_init();
 	is_next();
 	is_sun_family();
 	is_hp9k_family();

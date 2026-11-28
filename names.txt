@@ -33,6 +33,7 @@ Electron: Acorn Electron
 Galaksija: Galaksija
 ht1080z: TRS-80 Model I
 Jupiter: Jupiter Ace
+MacII: Apple Macintosh II
 MacPlus: Apple Macintosh Plus
 Minimig: Commodore Amiga
 MSX: MSX/MSX2/MSX2+/TurboR

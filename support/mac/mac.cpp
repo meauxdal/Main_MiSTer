@@ -29,15 +29,27 @@ char is_mac_scsi_family()
 	{
 		type = (is_core_named("maclc") || is_core_named("macplus") || is_core_named("macquadra800")
 	    || is_core_named("macquadra605") || is_core_named("macppc7300") || is_core_named("pippin")) ? 1 : 2;
-		if (type == 1)
-		{
-			sd_service = mac_sd_service;
-			// The Quadra 605 and LC 475 also carry a SWIM II floppy slot.
-			core_poll = (is_core_named("macquadra605") || is_core_named("maclc475"))
-			    ? mac_swim2_poll : mac_poll;
-		}
 	}
 	return type == 1;
+}
+
+void mac_init()
+{
+	if (!strcasecmp(user_io_get_core_name(1), "MacII"))
+	{
+		// MacII has SCSI disks on slots 0 and 1 and PRAM on slot 2.
+		sd_service = [](int disk, fileTYPE *f, int op, uint64_t lba, int sz, int ack) {
+			return (disk == 0 || disk == 1) ? mac_disk_service(disk, f, op, lba, sz, ack) : 0;
+		};
+		core_poll = mac_disk_poll;
+	}
+	else if (is_mac_scsi_family())
+	{
+		sd_service = mac_sd_service;
+		// The Quadra 605 and LC 475 also carry a SWIM II floppy slot.
+		core_poll = (is_core_named("macquadra605") || is_core_named("maclc475"))
+		    ? mac_swim2_poll : mac_poll;
+	}
 }
 
 char is_mac_scsi_optimized()

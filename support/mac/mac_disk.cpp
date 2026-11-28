@@ -13,7 +13,6 @@
 #include "../../file_io.h"
 #include "../../user_io.h"
 #include "../../spi.h"
-#include "mac.h"
 #include "mac_disk.h"
 
 #define BLKSZ    512
@@ -181,7 +180,7 @@ int mac_disk_service(int disk, fileTYPE *f, int op, uint64_t lba, int sz, int ac
 {
 	static uint8_t buf[UIO_BUFFER_SIZE];
 
-	if (disk < 0 || disk >= SLOTS || !op || !is_mac_scsi_family()) return 0;
+	if (disk < 0 || disk >= SLOTS || !op) return 0;
 
 	uint64_t off = lba * BLKSZ;
 	if (op != 2)
